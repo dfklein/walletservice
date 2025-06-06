@@ -7,10 +7,8 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-public class WalletCreateResponseDTO {
+public class WalletBalanceResponseDTO {
 
   private Long accountNumber;
-  private String descriprion;
   private BigDecimal balance;
-
 }

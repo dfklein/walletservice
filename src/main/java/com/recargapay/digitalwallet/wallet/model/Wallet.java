@@ -33,7 +33,7 @@ public class Wallet {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   @Column(unique = true, nullable = false)
-  private Long number;
+  private Long accountNumber;
 
   @ManyToOne(optional = false)
   @JoinColumn(name = "person_id", nullable = false)
