@@ -1,4 +1,4 @@
-package com.recargapay.wallet.person.dto;
+package com.recargapay.digitalwallet.person.dto;
 
 import lombok.Builder;
 import lombok.Data;
