@@ -8,10 +8,10 @@ import com.recargapay.digitalwallet.wallet.dto.WalletCreateRequestDTO;
 import com.recargapay.digitalwallet.wallet.dto.WalletCreateResponseDTO;
 import com.recargapay.digitalwallet.wallet.model.Wallet;
 import com.recargapay.digitalwallet.wallet.repository.WalletRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -22,6 +22,7 @@ public class WalletService {
   private final WalletRepository walletRepository;
   private final PersonRepository personRepository;
 
+  @Transactional(readOnly = true)
   public WalletBalanceResponseDTO getWalletBalance(Long accountNumber) throws BusinessException {
     var wallet = walletRepository.findById(accountNumber)
         .orElseThrow(() -> new BusinessException("Account not found for given number", HttpStatus.NOT_FOUND));
@@ -29,7 +30,7 @@ public class WalletService {
     return mapDBToBalanceRetrievalResponse(wallet);
   }
 
-  @Transactional
+  @Transactional(rollbackFor = { BusinessException.class })
   public WalletCreateResponseDTO createWallet(
       String documentNumber,
       WalletCreateRequestDTO requestBody) throws BusinessException {

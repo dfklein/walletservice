@@ -7,6 +7,7 @@ import com.recargapay.digitalwallet.person.repository.PersonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -14,6 +15,7 @@ public class PersonService {
 
   private final PersonRepository personRepository;
 
+  @Transactional(readOnly = true)
   public PersonResponseDTO findPersonByDocumentNumber(String documentNumber) throws BusinessException {
     return personRepository.findById(documentNumber)
         .map(PersonService::mapToResponse)
