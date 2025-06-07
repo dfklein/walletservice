@@ -12,6 +12,7 @@ import com.recargapay.digitalwallet.transaction.repository.TransactionRepository
 import com.recargapay.digitalwallet.wallet.dto.WalletResponseDTO;
 import com.recargapay.digitalwallet.wallet.model.Wallet;
 import com.recargapay.digitalwallet.wallet.service.WalletService;
+import jakarta.annotation.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 @Service
 public class TransactionService {
@@ -46,18 +48,47 @@ public class TransactionService {
       Long accountNumber,
       TransactionRequestDTO withdrawalRequest,
       String traceId) throws BusinessException {
-    final var transactionType = TransactionType.DEBIT;
+    return executeOneWayTransaction(
+        accountNumber,
+        withdrawalRequest,
+        TransactionType.DEBIT,
+        null,
+        traceId);
+  }
+
+  @Transactional(rollbackFor = { Exception.class })
+  public TransactionResponseDTO depositToAccount(
+      Long accountNumber,
+      TransactionRequestDTO withdrawalRequest,
+      String traceId) throws BusinessException {
+    return executeOneWayTransaction(
+        accountNumber,
+        withdrawalRequest,
+        TransactionType.CREDIT,
+        null,
+        traceId);
+  }
+
+  private TransactionResponseDTO executeOneWayTransaction(
+      Long accountNumber,
+      TransactionRequestDTO withdrawalRequest,
+      TransactionType transactionType,
+      @Nullable UUID transferReferenceId,
+      String traceId) throws BusinessException {
     final var operationTimestamp = ZonedDateTime.now(zoneId);
 
     try {
       final var wallet = walletService.findWalletByNumber(accountNumber);
 
-      validateWithdrawalOperation(wallet, withdrawalRequest);
+      if(TransactionType.DEBIT == transactionType) {
+        validateWithdrawalOperation(wallet, withdrawalRequest);
+      }
 
       var transaction = executeTransaction(
           wallet.getAccountNumber(),
           withdrawalRequest.amount(),
           transactionType,
+          transferReferenceId,
           operationTimestamp,
           traceId);
 
@@ -66,7 +97,7 @@ public class TransactionService {
           withdrawalRequest.amount(),
           transactionType);
 
-      var response = mapNonFullTransferTransactionToResponse(transaction, TransactionDTOType.WITHDRAWAL);
+      var response = mapNonFullTransferTransactionToResponse(transaction, resolveResponseTransactionType(transactionType, transferReferenceId));
 
       // only audit success right before return statement
       auditLogService.registerTransactionOperationLog(
@@ -96,28 +127,6 @@ public class TransactionService {
     }
   }
 
-  /**
-   @Transactional(rollbackFor = { Exception.class })
-  public ResponseEntity<TransactionResponseDTO> depositToAccount(
-      Long accountNumber,
-      UUID tracerId) throws BusinessException {
-    var timestamp = ZonedDateTime.now(zoneId);
-    var wallet = walletService.findWalletByNumber(accountNumber);
-
-  }
-
-   @Transactional(rollbackFor = { Exception.class })
-  public ResponseEntity<TransactionResponseDTO> transfer(
-      Long fromAccountNumber,
-      Long toAccountNumber,
-      UUID tracerId) throws BusinessException {
-    var timestamp = ZonedDateTime.now(zoneId);
-    var fromWallet = walletService.findWalletByNumber(fromAccountNumber);
-    var toWallet = walletService.findWalletByNumber(fromAccountNumber);
-
-  }
-  */
-
   private static void validateWithdrawalOperation(
       WalletResponseDTO wallet,
       TransactionRequestDTO withdrawalRequest) throws BusinessException {
@@ -126,10 +135,23 @@ public class TransactionService {
     }
   }
 
+  private static TransactionDTOType resolveResponseTransactionType(TransactionType transactionType, UUID transferReferenceId) {
+    if(transferReferenceId == null) {
+      if(TransactionType.CREDIT == transactionType) {
+        return TransactionDTOType.DEPOSIT;
+      }
+      return TransactionDTOType.WITHDRAWAL;
+
+    } else {
+      return TransactionDTOType.TRANSFER;
+    }
+  }
+
   private Transaction executeTransaction(
       Long accountNumber,
       BigDecimal amount,
       TransactionType transactionType,
+      UUID transferReferenceId,
       ZonedDateTime timestamp,
       String tracerId) {
 
@@ -139,6 +161,7 @@ public class TransactionService {
             .build())
         .amount(amount)
         .transactionType(transactionType)
+        .transferReferenceId(transferReferenceId)
         .transactionTime(timestamp)
         .transactionTracerId(tracerId)
         .build()

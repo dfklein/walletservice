@@ -25,13 +25,27 @@ public class TransactionController {
   private final TransactionService transactionService;
 
   @PostMapping("/wallets/{accountNumber}/withdrawals")
-  public ResponseEntity<TransactionResponseDTO> createWalletByPersonId(
+  public ResponseEntity<TransactionResponseDTO> withdrawalFromAccount(
       @PathVariable Long accountNumber,
       @RequestBody TransactionRequestDTO body,
       @RequestHeader(value = "traceId", required = false) String traceId) throws BusinessException {
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(transactionService.withdrawalFromAccount(
+            accountNumber,
+            body,
+            resolveTraceId(traceId))
+        );
+  }
+
+  @PostMapping("/wallets/{accountNumber}/deposits")
+  public ResponseEntity<TransactionResponseDTO> depositToAccount(
+      @PathVariable Long accountNumber,
+      @RequestBody TransactionRequestDTO body,
+      @RequestHeader(value = "traceId", required = false) String traceId) throws BusinessException {
+    return ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(transactionService.depositToAccount(
             accountNumber,
             body,
             resolveTraceId(traceId))

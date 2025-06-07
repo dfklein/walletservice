@@ -47,4 +47,7 @@ public class Transaction {
   @Column(nullable = false)
   private TransactionType transactionType;
 
+  @Column
+  private UUID transferReferenceId;
+
 }
