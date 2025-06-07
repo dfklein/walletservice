@@ -1,9 +1,8 @@
 package com.recargapay.digitalwallet.wallet.controller;
 
 import com.recargapay.digitalwallet.exceptions.BusinessException;
-import com.recargapay.digitalwallet.wallet.dto.WalletBalanceResponseDTO;
 import com.recargapay.digitalwallet.wallet.dto.WalletCreateRequestDTO;
-import com.recargapay.digitalwallet.wallet.dto.WalletCreateResponseDTO;
+import com.recargapay.digitalwallet.wallet.dto.WalletResponseDTO;
 import com.recargapay.digitalwallet.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,13 +22,13 @@ public class WalletController {
   private final WalletService walletService;
 
   @GetMapping("/wallets/{accountNumber}/balance")
-  public ResponseEntity<WalletBalanceResponseDTO> getWalletBalance(
+  public ResponseEntity<WalletResponseDTO> getWalletBalance(
       @PathVariable Long accountNumber) throws BusinessException {
-    return ResponseEntity.ok(walletService.getWalletBalance(accountNumber));
+    return ResponseEntity.ok(walletService.findBalanceByAccountNumber(accountNumber));
   }
 
   @PostMapping("/persons/{documentNumber}/wallets")
-  public ResponseEntity<WalletCreateResponseDTO> createWalletByPersonId(
+  public ResponseEntity<WalletResponseDTO> createWalletByPersonId(
       @PathVariable String documentNumber,
       @RequestBody WalletCreateRequestDTO body) throws BusinessException {
     return ResponseEntity.status(HttpStatus.CREATED)

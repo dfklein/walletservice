@@ -28,8 +28,10 @@ public class Person {
   @Column(nullable = false, unique = true)
   private String documentNumber;
 
+  @Column(nullable = false)
   private String firstName;
 
+  @Column(nullable = false)
   private String lastName;
 
   private String email;

@@ -35,10 +35,16 @@ public class Transaction {
   @JoinColumn(name = "wallet_id", nullable = false)
   private Wallet wallet;
 
+  @Column(nullable = false)
+  private UUID transactionTracerId;
+
+  @Column(nullable = false)
   private ZonedDateTime transactionTime;
 
+  @Column(nullable = false)
   private BigDecimal amount;
 
+  @Column(nullable = false)
   private TransactionType transactionType;
 
 }

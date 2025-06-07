@@ -27,12 +27,14 @@ public class DataInitializer {
 
     var wallet1 = Wallet.builder()
         .balance(BigDecimal.ZERO)
+        .overdraftLimit(new BigDecimal(10))
         .description("my first wallet")
         .person(person)
         .build();
 
     var wallet2 = Wallet.builder()
         .balance(BigDecimal.ZERO)
+        .overdraftLimit(new BigDecimal(10))
         .description("a second wallet for me!")
         .person(person)
         .build();

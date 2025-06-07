@@ -42,7 +42,11 @@ public class Wallet {
   @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<Transaction> transactions = new ArrayList<>();
 
+  @Column(nullable = false)
   private BigDecimal balance;
+
+  @Column(nullable = false)
+  private BigDecimal overdraftLimit;
 
   private String description;
 }
