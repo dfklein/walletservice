@@ -13,7 +13,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransactionResponseDTO {
 
-  private UUID transactionTracerId;
+  private String transactionTracerId;
   private TransactionDTOType type;
   private BigDecimal amount;
   private Long fromWalletNumber;

@@ -1,9 +1,11 @@
 package com.recargapay.digitalwallet.transaction.service;
 
+import com.recargapay.digitalwallet.audit.AuditLogService;
+import com.recargapay.digitalwallet.audit.OperationStatus;
 import com.recargapay.digitalwallet.exceptions.BusinessException;
 import com.recargapay.digitalwallet.transaction.dto.TransactionDTOType;
-import com.recargapay.digitalwallet.transaction.dto.TransactionResponseDTO;
 import com.recargapay.digitalwallet.transaction.dto.TransactionRequestDTO;
+import com.recargapay.digitalwallet.transaction.dto.TransactionResponseDTO;
 import com.recargapay.digitalwallet.transaction.model.Transaction;
 import com.recargapay.digitalwallet.transaction.model.TransactionType;
 import com.recargapay.digitalwallet.transaction.repository.TransactionRepository;
@@ -18,53 +20,84 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.UUID;
 
 @Service
 public class TransactionService {
 
-  private final ZoneId zoneId;
   private final TransactionRepository transactionRepository;
   private final WalletService walletService;
-  private final UUID transactionTracerId;
+  private final AuditLogService auditLogService;
+
+  private final ZoneId zoneId;
 
   public TransactionService(
       @Value("${app.zoneId}") ZoneId zoneId,
       TransactionRepository transactionRepository,
-      WalletService walletService) {
+      WalletService walletService,
+      AuditLogService auditLogService) {
     this.zoneId = zoneId;
     this.transactionRepository = transactionRepository;
     this.walletService = walletService;
-    this.transactionTracerId = UUID.randomUUID();
+    this.auditLogService = auditLogService;
   }
 
-  @Transactional
+  @Transactional(rollbackFor = { Exception.class })
   public TransactionResponseDTO withdrawalFromAccount(
       Long accountNumber,
-      TransactionRequestDTO withdrawalRequest) throws BusinessException {
-    final var txType = TransactionType.DEBIT;
-    final var timestamp = ZonedDateTime.now(zoneId);
-    final var wallet = walletService.findWalletByNumber(accountNumber);
+      TransactionRequestDTO withdrawalRequest,
+      String traceId) throws BusinessException {
+    final var transactionType = TransactionType.DEBIT;
+    final var operationTimestamp = ZonedDateTime.now(zoneId);
 
-    validateWithdrawalOperation(wallet, withdrawalRequest);
+    try {
+      final var wallet = walletService.findWalletByNumber(accountNumber);
 
-    var transaction = executeTransaction(
-        wallet.getAccountNumber(),
-        withdrawalRequest.amount(),
-        txType,
-        timestamp,
-        transactionTracerId);
+      validateWithdrawalOperation(wallet, withdrawalRequest);
 
-    walletService.updateWalletBalance(
-        wallet.getAccountNumber(),
-        withdrawalRequest.amount(),
-        txType);
+      var transaction = executeTransaction(
+          wallet.getAccountNumber(),
+          withdrawalRequest.amount(),
+          transactionType,
+          operationTimestamp,
+          traceId);
 
-    return mapNonFullTransferTransactionToResponse(transaction, TransactionDTOType.WITHDRAWAL);
+      walletService.updateWalletBalance(
+          wallet.getAccountNumber(),
+          withdrawalRequest.amount(),
+          transactionType);
+
+      var response = mapNonFullTransferTransactionToResponse(transaction, TransactionDTOType.WITHDRAWAL);
+
+      // only audit success right before return statement
+      auditLogService.registerTransactionOperationLog(
+          transactionType,
+          accountNumber,
+          withdrawalRequest.amount(),
+          operationTimestamp,
+          traceId,
+          OperationStatus.SUCCESS,
+          null
+      );
+
+      return response;
+
+    } catch (Exception e) {
+      auditLogService.registerTransactionOperationLog(
+          transactionType,
+          accountNumber,
+          withdrawalRequest.amount(),
+          operationTimestamp,
+          traceId,
+          OperationStatus.FAILURE,
+          e.getMessage()
+      );
+
+      throw e;
+    }
   }
 
   /**
-  @Transactional
+   @Transactional(rollbackFor = { Exception.class })
   public ResponseEntity<TransactionResponseDTO> depositToAccount(
       Long accountNumber,
       UUID tracerId) throws BusinessException {
@@ -73,7 +106,7 @@ public class TransactionService {
 
   }
 
-  @Transactional
+   @Transactional(rollbackFor = { Exception.class })
   public ResponseEntity<TransactionResponseDTO> transfer(
       Long fromAccountNumber,
       Long toAccountNumber,
@@ -98,7 +131,7 @@ public class TransactionService {
       BigDecimal amount,
       TransactionType transactionType,
       ZonedDateTime timestamp,
-      UUID tracerId) {
+      String tracerId) {
 
     return transactionRepository.save(Transaction.builder()
         .wallet(Wallet.builder()

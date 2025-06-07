@@ -1,13 +1,11 @@
-package com.recargapay.digitalwallet.transaction.model;
+package com.recargapay.digitalwallet.audit;
 
-import com.recargapay.digitalwallet.wallet.model.Wallet;
+import com.recargapay.digitalwallet.transaction.model.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
@@ -22,29 +21,32 @@ import java.util.UUID;
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class Transaction {
+@NoArgsConstructor
+public class AuditLog {
 
   @Id
   @GeneratedValue(strategy = GenerationType.AUTO)
   @Column(updatable = false, nullable = false)
   private UUID id;
 
-  @ManyToOne(optional = false)
-  @JoinColumn(name = "wallet_id", nullable = false)
-  private Wallet wallet;
+  @Column(nullable = false)
+  private String traceId;
+
+  private String message;
 
   @Column(nullable = false)
-  private String transactionTracerId;
+  private TransactionType transactionType;
 
   @Column(nullable = false)
-  private ZonedDateTime transactionTime;
+  private Long accountNumber;
 
   @Column(nullable = false)
   private BigDecimal amount;
 
   @Column(nullable = false)
-  private TransactionType transactionType;
+  private ZonedDateTime timestamp;
 
+  @Column(nullable = false)
+  private OperationStatus status;
 }
