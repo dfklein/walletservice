@@ -42,10 +42,10 @@ public class Wallet {
   @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<Transaction> transactions = new ArrayList<>();
 
-  @Column(nullable = false)
+  @Column(nullable = false, columnDefinition = "decimal(10,2) default 0.00")
   private BigDecimal balance;
 
-  @Column(nullable = false)
+  @Column(nullable = false, columnDefinition = "decimal(10,2) default 0.00")
   private BigDecimal overdraftLimit;
 
   private String description;

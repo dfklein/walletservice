@@ -5,6 +5,7 @@ import com.recargapay.digitalwallet.transaction.dto.TransactionRequestDTO;
 import com.recargapay.digitalwallet.transaction.dto.TransactionResponseDTO;
 import com.recargapay.digitalwallet.transaction.service.TransactionService;
 import com.recargapay.digitalwallet.wallet.dto.WalletResponseDTO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,12 +29,12 @@ public class TransactionController {
   public ResponseEntity<TransactionResponseDTO> withdrawalFromAccount(
       @PathVariable Long accountNumber,
       @RequestBody TransactionRequestDTO body,
-      @RequestHeader(value = "traceId", required = false) String traceId) throws BusinessException {
+      @RequestHeader(value = "traceId", required = false) String traceId) throws Exception {
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(transactionService.withdrawalFromAccount(
             accountNumber,
-            body,
+            body.amount(),
             resolveTraceId(traceId))
         );
   }
@@ -42,12 +43,27 @@ public class TransactionController {
   public ResponseEntity<TransactionResponseDTO> depositToAccount(
       @PathVariable Long accountNumber,
       @RequestBody TransactionRequestDTO body,
-      @RequestHeader(value = "traceId", required = false) String traceId) throws BusinessException {
+      @RequestHeader(value = "traceId", required = false) String traceId) throws Exception {
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(transactionService.depositToAccount(
             accountNumber,
-            body,
+            body.amount(),
+            resolveTraceId(traceId))
+        );
+  }
+
+  @PostMapping("/wallets/{sourceAccountNumber}/transfers")
+  public ResponseEntity<TransactionResponseDTO> transferToAccount(
+      @PathVariable Long sourceAccountNumber,
+      @RequestBody TransactionRequestDTO body,
+      @RequestHeader(value = "traceId", required = false) String traceId) throws Exception {
+    return ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(transactionService.transfer(
+            sourceAccountNumber,
+            body.destinationAccountNumber(),
+            body.amount(),
             resolveTraceId(traceId))
         );
   }

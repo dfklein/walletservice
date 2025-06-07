@@ -4,7 +4,6 @@ import com.recargapay.digitalwallet.audit.AuditLogService;
 import com.recargapay.digitalwallet.audit.OperationStatus;
 import com.recargapay.digitalwallet.exceptions.BusinessException;
 import com.recargapay.digitalwallet.transaction.dto.TransactionDTOType;
-import com.recargapay.digitalwallet.transaction.dto.TransactionRequestDTO;
 import com.recargapay.digitalwallet.transaction.dto.TransactionResponseDTO;
 import com.recargapay.digitalwallet.transaction.model.Transaction;
 import com.recargapay.digitalwallet.transaction.model.TransactionType;
@@ -46,64 +45,25 @@ public class TransactionService {
   @Transactional(rollbackFor = { Exception.class })
   public TransactionResponseDTO withdrawalFromAccount(
       Long accountNumber,
-      TransactionRequestDTO withdrawalRequest,
-      String traceId) throws BusinessException {
-    return executeOneWayTransaction(
-        accountNumber,
-        withdrawalRequest,
-        TransactionType.DEBIT,
-        null,
-        traceId);
-  }
-
-  @Transactional(rollbackFor = { Exception.class })
-  public TransactionResponseDTO depositToAccount(
-      Long accountNumber,
-      TransactionRequestDTO withdrawalRequest,
-      String traceId) throws BusinessException {
-    return executeOneWayTransaction(
-        accountNumber,
-        withdrawalRequest,
-        TransactionType.CREDIT,
-        null,
-        traceId);
-  }
-
-  private TransactionResponseDTO executeOneWayTransaction(
-      Long accountNumber,
-      TransactionRequestDTO withdrawalRequest,
-      TransactionType transactionType,
-      @Nullable UUID transferReferenceId,
-      String traceId) throws BusinessException {
+      BigDecimal amount,
+      String traceId) throws Exception {
     final var operationTimestamp = ZonedDateTime.now(zoneId);
 
     try {
-      final var wallet = walletService.findWalletByNumber(accountNumber);
-
-      if(TransactionType.DEBIT == transactionType) {
-        validateWithdrawalOperation(wallet, withdrawalRequest);
-      }
-
-      var transaction = executeTransaction(
-          wallet.getAccountNumber(),
-          withdrawalRequest.amount(),
-          transactionType,
-          transferReferenceId,
+      var transaction = executeOneWayTransaction(
+          accountNumber,
+          TransactionType.DEBIT,
+          amount,
+          null,
           operationTimestamp,
           traceId);
 
-      walletService.updateWalletBalance(
-          wallet.getAccountNumber(),
-          withdrawalRequest.amount(),
-          transactionType);
+      var response = mapNonFullTransferTransactionToResponse(transaction);
 
-      var response = mapNonFullTransferTransactionToResponse(transaction, resolveResponseTransactionType(transactionType, transferReferenceId));
-
-      // only audit success right before return statement
       auditLogService.registerTransactionOperationLog(
-          transactionType,
           accountNumber,
-          withdrawalRequest.amount(),
+          TransactionType.DEBIT,
+          amount,
           operationTimestamp,
           traceId,
           OperationStatus.SUCCESS,
@@ -111,12 +71,11 @@ public class TransactionService {
       );
 
       return response;
-
     } catch (Exception e) {
       auditLogService.registerTransactionOperationLog(
-          transactionType,
           accountNumber,
-          withdrawalRequest.amount(),
+          TransactionType.DEBIT,
+          amount,
           operationTimestamp,
           traceId,
           OperationStatus.FAILURE,
@@ -127,15 +86,164 @@ public class TransactionService {
     }
   }
 
+  @Transactional(rollbackFor = { Exception.class })
+  public TransactionResponseDTO depositToAccount(
+      Long accountNumber,
+      BigDecimal amount,
+      String traceId) throws Exception {
+    final var operationTimestamp = ZonedDateTime.now(zoneId);
+
+    try {
+      var transaction = executeOneWayTransaction(
+          accountNumber,
+          TransactionType.CREDIT,
+          amount,
+          null,
+          operationTimestamp,
+          traceId);
+
+      var response = mapNonFullTransferTransactionToResponse(transaction);
+
+      auditLogService.registerTransactionOperationLog(
+          accountNumber,
+          TransactionType.CREDIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.SUCCESS,
+          null
+      );
+
+      return response;
+    } catch (Exception e) {
+      auditLogService.registerTransactionOperationLog(
+          accountNumber,
+          TransactionType.DEBIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.FAILURE,
+          e.getMessage()
+      );
+      throw e;
+    }
+  }
+
+  @Transactional(rollbackFor = { Exception.class })
+  public TransactionResponseDTO transfer(
+      Long fromAccountNumber,
+      Long toAccountNumber,
+      BigDecimal amount,
+      String traceId) throws Exception {
+    final var transferReferenceId = UUID.randomUUID();
+    final var operationTimestamp = ZonedDateTime.now(zoneId);
+
+    try {
+      var transactionFrom = executeOneWayTransaction(
+          fromAccountNumber,
+          TransactionType.DEBIT,
+          amount,
+          transferReferenceId,
+          operationTimestamp,
+          traceId);
+
+      var transactionTo = executeOneWayTransaction(
+          toAccountNumber,
+          TransactionType.CREDIT,
+          amount,
+          transferReferenceId,
+          operationTimestamp,
+          traceId);
+
+      var response = mapFullTransferTransactionToResponse(transactionFrom, transactionTo);
+
+      auditLogService.registerTransactionOperationLog(
+          fromAccountNumber,
+          TransactionType.DEBIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.SUCCESS,
+          null
+      );
+
+      auditLogService.registerTransactionOperationLog(
+          toAccountNumber,
+          TransactionType.CREDIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.SUCCESS,
+          null
+      );
+
+      return response;
+
+    } catch (Exception e) {
+      auditLogService.registerTransactionOperationLog(
+          fromAccountNumber,
+          TransactionType.DEBIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.FAILURE,
+          e.getMessage()
+      );
+
+      auditLogService.registerTransactionOperationLog(
+          toAccountNumber,
+          TransactionType.CREDIT,
+          amount,
+          operationTimestamp,
+          traceId,
+          OperationStatus.FAILURE,
+          e.getMessage()
+      );
+      throw e;
+
+    }
+  }
+
+  private Transaction executeOneWayTransaction(
+      Long accountNumber,
+      TransactionType transactionType,
+      BigDecimal amount,
+      @Nullable UUID transferReferenceId,
+      ZonedDateTime operationTimestamp,
+      String traceId) throws BusinessException {
+      final var wallet = walletService.findWalletByNumber(accountNumber);
+
+      if(TransactionType.DEBIT == transactionType) {
+        validateWithdrawalOperation(wallet, amount);
+      }
+
+      var transaction = executeTransaction(
+          wallet.getAccountNumber(),
+          amount,
+          transactionType,
+          transferReferenceId,
+          operationTimestamp,
+          traceId);
+
+      walletService.updateWalletBalance(
+          wallet.getAccountNumber(),
+          amount,
+          transactionType);
+
+      return transaction;
+  }
+
   private static void validateWithdrawalOperation(
       WalletResponseDTO wallet,
-      TransactionRequestDTO withdrawalRequest) throws BusinessException {
-    if (withdrawalRequest.amount().compareTo(wallet.getBalance().add(wallet.getOverdraftLimit())) > 0) {
+      BigDecimal amount) throws BusinessException {
+    if (amount.compareTo(wallet.getBalance().add(wallet.getOverdraftLimit())) > 0) {
       throw new BusinessException("Insufficient funds", HttpStatus.BAD_REQUEST);
     }
   }
 
-  private static TransactionDTOType resolveResponseTransactionType(TransactionType transactionType, UUID transferReferenceId) {
+  private static TransactionDTOType resolveResponseTransactionType(
+      TransactionType transactionType,
+      UUID transferReferenceId) {
     if(transferReferenceId == null) {
       if(TransactionType.CREDIT == transactionType) {
         return TransactionDTOType.DEPOSIT;
@@ -168,9 +276,9 @@ public class TransactionService {
     );
   }
 
-  private static TransactionResponseDTO mapNonFullTransferTransactionToResponse(
-      Transaction transaction,
-      TransactionDTOType transactionType) {
+  private static TransactionResponseDTO mapNonFullTransferTransactionToResponse(Transaction transaction) {
+    var transactionType = resolveResponseTransactionType(transaction.getTransactionType(), transaction.getTransferReferenceId());
+
     var transactionResponse = TransactionResponseDTO.builder()
         .amount(transaction.getAmount())
         .type(transactionType)
@@ -184,5 +292,16 @@ public class TransactionService {
     }
     
     return transactionResponse.build();
+  }
+
+  private TransactionResponseDTO mapFullTransferTransactionToResponse(Transaction transactionFrom, Transaction transactionTo) {
+    return TransactionResponseDTO.builder()
+        .amount(transactionFrom.getAmount())
+        .type(TransactionDTOType.TRANSFER)
+        .fromWalletNumber(transactionFrom.getWallet().getAccountNumber())
+        .toWalletNumber(transactionTo.getWallet().getAccountNumber())
+        .transactionTracerId(transactionFrom.getTransactionTracerId())
+        .timestamp(transactionFrom.getTransactionTime().toLocalDateTime())
+        .build();
   }
 }

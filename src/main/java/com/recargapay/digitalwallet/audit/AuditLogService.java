@@ -18,8 +18,8 @@ public class AuditLogService {
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public AuditLog registerTransactionOperationLog(
-      TransactionType transactionType,
       Long accountNumber,
+      TransactionType transactionType,
       BigDecimal amount,
       ZonedDateTime operationTimestamp,
       String traceId,
