@@ -18,8 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -41,6 +44,42 @@ public class TransactionService {
     this.walletService = walletService;
     this.auditLogService = auditLogService;
   }
+
+  @Transactional(readOnly = true)
+  public List<TransactionResponseDTO> getTransactionsForAccount(
+      Long accountNumber,
+      LocalDate from,
+      LocalDate to) {
+
+    List<Transaction> transactions;
+
+    if (from != null && to != null) {
+      ZonedDateTime start = from.atStartOfDay(ZoneId.systemDefault());
+      ZonedDateTime end = to.atTime(LocalTime.MAX).atZone(ZoneId.systemDefault());
+      transactions = transactionRepository.findTransactionsByAccountNumberAndPeriod(accountNumber, start, end);
+
+    } else if (from != null) {
+      ZonedDateTime start = from.atStartOfDay(ZoneId.systemDefault());
+      transactions = transactionRepository.findTransactionsByAccountNumberFrom(accountNumber, start);
+
+    } else if (to != null) {
+      ZonedDateTime end = to.atTime(LocalTime.MAX).atZone(ZoneId.systemDefault());
+      transactions = transactionRepository.findTransactionsByAccountNumberUntil(accountNumber, end);
+
+    } else {
+      transactions = transactionRepository.findTransactionsByAccountNumber(accountNumber);
+    }
+
+    return transactions.stream()
+        .map(tr -> TransactionResponseDTO.builder()
+            .id(tr.getId().toString())
+            .type(resolveResponseTransactionType(tr.getTransactionType(), tr.getTransferReferenceId()))
+            .amount(tr.getAmount())
+            .timestamp(tr.getTransactionTime().toLocalDateTime())
+            .build())
+        .toList();
+  }
+
 
   @Transactional(rollbackFor = { Exception.class })
   public TransactionResponseDTO withdrawalFromAccount(
@@ -282,7 +321,7 @@ public class TransactionService {
     var transactionResponse = TransactionResponseDTO.builder()
         .amount(transaction.getAmount())
         .type(transactionType)
-        .transactionTracerId(transaction.getTransactionTracerId())
+        .id(transaction.getId().toString())
         .timestamp(transaction.getTransactionTime().toLocalDateTime());
 
     switch (transactionType) {
@@ -300,7 +339,7 @@ public class TransactionService {
         .type(TransactionDTOType.TRANSFER)
         .fromWalletNumber(transactionFrom.getWallet().getAccountNumber())
         .toWalletNumber(transactionTo.getWallet().getAccountNumber())
-        .transactionTracerId(transactionFrom.getTransactionTracerId())
+        .id(transactionFrom.getId().toString())
         .timestamp(transactionFrom.getTransactionTime().toLocalDateTime())
         .build();
   }
