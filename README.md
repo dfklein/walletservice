@@ -1,5 +1,7 @@
 # Wallet Service
 
+This project was developed for a Recarga Pay recruitment process. It took something about 8 to 9 hours to complete it.
+
 ## Starting this app
 
 This project was built using maven and Java version 21. Make sure you have both Java SDK and Maven installed. Once you have it, the very first thing you need to do is to build its jar using maven from the root folder of the project:
