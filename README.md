@@ -78,6 +78,8 @@ Since user creation or management was not a requirement, this application will a
 
 Have in mind that application is not set to persist any data inserted or removed after it's terminated, meaning everytime you restart the application will work as a database reset.
 
+If you ever want to change anything on this users, check ```DataInitializer``` class.
+
 <b>ABOUT THE H2 DATABASE</b>
 
 If you'd like to check database, it will be available at 
