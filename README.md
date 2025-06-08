@@ -1,6 +1,6 @@
 # Wallet Service
 
-This project was developed for a Recarga Pay recruitment process. It took something about 8 to 9 hours to complete it.
+This project was developed for a Recarga Pay recruitment process. It took something between 8 to 9 hours to complete it.
 
 ## Starting this app
 
